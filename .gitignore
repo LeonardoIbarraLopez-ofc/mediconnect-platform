@@ -1,0 +1,227 @@
+# ─────────────────────────────────────────────────────────────────
+#  MediConnect S.A.S. — .gitignore profesional
+#  Monorepo Node.js/TypeScript + Terraform + Docker
+# ─────────────────────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════════
+#  DEPENDENCIAS
+# ══════════════════════════════════════════════════════════════════
+node_modules/
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.npm/
+
+# ══════════════════════════════════════════════════════════════════
+#  COMPILACIÓN TypeScript
+# ══════════════════════════════════════════════════════════════════
+dist/
+build/
+out/
+*.js.map
+*.d.ts.map
+tsconfig.tsbuildinfo
+
+# ══════════════════════════════════════════════════════════════════
+#  VARIABLES DE ENTORNO — NUNCA subir credenciales
+# ══════════════════════════════════════════════════════════════════
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.staging
+.env.production
+.env.production.local
+.env.*.local
+*.env
+
+# ══════════════════════════════════════════════════════════════════
+#  SECRETOS Y CREDENCIALES — crítico en telemedicina
+# ══════════════════════════════════════════════════════════════════
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.crt
+*.csr
+secrets/
+.secrets/
+credentials.json
+service-account*.json
+*-credentials.json
+aws-credentials
+.aws/credentials
+
+# JWT / HMAC secrets explícitos
+jwt-secret.txt
+hmac-secret.txt
+
+# ══════════════════════════════════════════════════════════════════
+#  TERRAFORM — estado e infraestructura sensible
+# ══════════════════════════════════════════════════════════════════
+infrastructure/terraform/.terraform/
+infrastructure/terraform/.terraform.lock.hcl
+infrastructure/terraform/terraform.tfstate
+infrastructure/terraform/terraform.tfstate.backup
+infrastructure/terraform/*.tfvars
+infrastructure/terraform/override.tf
+infrastructure/terraform/override.tf.json
+infrastructure/terraform/*_override.tf
+infrastructure/terraform/*_override.tf.json
+infrastructure/terraform/crash.log
+
+# ══════════════════════════════════════════════════════════════════
+#  DOCKER
+# ══════════════════════════════════════════════════════════════════
+# Los docker-compose.override.yml locales no se suben (tienen configs dev)
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+# ══════════════════════════════════════════════════════════════════
+#  LOGS — nunca en el repositorio
+# ══════════════════════════════════════════════════════════════════
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ══════════════════════════════════════════════════════════════════
+#  TESTING Y COBERTURA
+# ══════════════════════════════════════════════════════════════════
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# ══════════════════════════════════════════════════════════════════
+#  CACHES DE HERRAMIENTAS
+# ══════════════════════════════════════════════════════════════════
+.cache/
+.eslintcache
+.stylelintcache
+.prettiercache
+.parcel-cache/
+.turbo/
+.nx/cache/
+
+# ══════════════════════════════════════════════════════════════════
+#  IDEs Y EDITORES
+# ══════════════════════════════════════════════════════════════════
+
+# VS Code — solo se comparte settings básicos del proyecto (extensions, etc.)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+
+# JetBrains (IntelliJ, WebStorm, Rider)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+
+# ══════════════════════════════════════════════════════════════════
+#  SISTEMA OPERATIVO
+# ══════════════════════════════════════════════════════════════════
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+
+# ══════════════════════════════════════════════════════════════════
+#  CLIENTE PWA (client/)
+# ══════════════════════════════════════════════════════════════════
+client/.next/
+client/.nuxt/
+client/.output/
+client/.vite/
+client/dist/
+# Service worker generado (se regenera en build)
+client/public/service-worker.js
+client/public/workbox-*.js
+
+# ══════════════════════════════════════════════════════════════════
+#  BASES DE DATOS LOCALES (dev)
+# ══════════════════════════════════════════════════════════════════
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+# Datos de volúmenes Docker locales
+data/
+volumes/
+
+# ══════════════════════════════════════════════════════════════════
+#  ARCHIVOS TEMPORALES Y GENERADOS
+# ══════════════════════════════════════════════════════════════════
+tmp/
+temp/
+.tmp/
+*.tmp
+*.temp
+*.bak
+*.orig
+
+# Archivos de lock de procesos
+*.pid
+*.seed
+*.pid.lock
+
+# ══════════════════════════════════════════════════════════════════
+#  OPENAPI / SWAGGER GENERADO
+#  Los specs .yaml se versionan; los HTML/JSON generados no
+# ══════════════════════════════════════════════════════════════════
+docs/generated/
+swagger-ui-dist/
+*.swagger.json
+
+# ══════════════════════════════════════════════════════════════════
+#  ARCHIVOS DE AUDIT / GRABACIONES LOCALES
+#  Las grabaciones van a S3, nunca al repo
+# ══════════════════════════════════════════════════════════════════
+recordings/
+*.webm
+*.mp4
+*.mkv
