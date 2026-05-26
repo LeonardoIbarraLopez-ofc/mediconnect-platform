@@ -1,0 +1,190 @@
+# Docker Compose: Infraestructura Completa MediConnect
+# Levanta todos los microservicios y sus bases de datos dedicadas.
+# Según FUNCIONAMIENTO.MD: "cada servicio apunte a su instancia de
+# base de datos dedicada (PostgreSQL para Citas, InfluxDB para IoT)".
+# Para desarrollo local: docker compose up -d
+# Para producción: usar Terraform (ver terraform/main.tf)
+
+version: '3.9'
+
+networks:
+  mediconnect-net:
+    driver: bridge
+
+volumes:
+  postgres-appointments-data:
+  postgres-prescriptions-data:
+  postgres-audit-data:
+  mongo-ehr-data:
+  influxdb-iot-data:
+
+services:
+  # ─── Mensajería ───────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks: [mediconnect-net]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on: [zookeeper]
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks: [mediconnect-net]
+
+  # ─── Broker MQTT para IoT ─────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+    networks: [mediconnect-net]
+
+  # ─── Bases de Datos ───────────────────────────────────────────
+  postgres-appointments:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: appointments_db
+      POSTGRES_USER: mediconnect
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres-appointments-data:/var/lib/postgresql/data
+    networks: [mediconnect-net]
+
+  postgres-prescriptions:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: prescriptions_db
+      POSTGRES_USER: mediconnect
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres-prescriptions-data:/var/lib/postgresql/data
+    networks: [mediconnect-net]
+
+  postgres-audit:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: audit_ledger_db
+      POSTGRES_USER: mediconnect
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres-audit-data:/var/lib/postgresql/data
+    networks: [mediconnect-net]
+
+  mongo-ehr:
+    image: mongo:7.0
+    volumes:
+      - mongo-ehr-data:/data/db
+    networks: [mediconnect-net]
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: mediconnect
+      DOCKER_INFLUXDB_INIT_PASSWORD: mediconnect-secret
+      DOCKER_INFLUXDB_INIT_ORG: mediconnect
+      DOCKER_INFLUXDB_INIT_BUCKET: telemetry
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: mediconnect-token
+    volumes:
+      - influxdb-iot-data:/var/lib/influxdb2
+    networks: [mediconnect-net]
+
+  # ─── Microservicios ───────────────────────────────────────────
+  api-gateway:
+    build: ../api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      JWT_SECRET: mediconnect-jwt-secret
+      APPOINTMENT_SERVICE_URL: http://appointment-service:3001
+      TELEMEDICINE_SERVICE_URL: http://telemedicine-service:3002
+      EHR_SERVICE_URL: http://ehr-service:3003
+      PRESCRIPTION_SERVICE_URL: http://prescription-service:3004
+      IOT_SERVICE_URL: http://iot-service:3005
+      AUDIT_SERVICE_URL: http://audit-service:3006
+    depends_on: [kafka]
+    networks: [mediconnect-net]
+
+  appointment-service:
+    build: ../services/appointment-service
+    ports:
+      - "3001:3001"
+    environment:
+      POSTGRES_HOST: postgres-appointments
+      POSTGRES_DB: appointments_db
+      POSTGRES_USER: mediconnect
+      POSTGRES_PASSWORD: secret
+      KAFKA_BROKERS: kafka:9092
+      HMAC_SECRET: mediconnect-hmac-secret
+    depends_on: [postgres-appointments, kafka]
+    networks: [mediconnect-net]
+
+  telemedicine-service:
+    build: ../services/telemedicine-service
+    ports:
+      - "3002:3002"
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      HMAC_SECRET: mediconnect-hmac-secret
+    depends_on: [kafka]
+    networks: [mediconnect-net]
+
+  ehr-service:
+    build: ../services/ehr-service
+    ports:
+      - "3003:3003"
+    environment:
+      MONGO_URI: mongodb://mongo-ehr:27017
+      KAFKA_BROKERS: kafka:9092
+    depends_on: [mongo-ehr, kafka]
+    networks: [mediconnect-net]
+
+  prescription-service:
+    build: ../services/prescription-service
+    ports:
+      - "3004:3004"
+    environment:
+      POSTGRES_HOST: postgres-prescriptions
+      POSTGRES_DB: prescriptions_db
+      POSTGRES_USER: mediconnect
+      POSTGRES_PASSWORD: secret
+      KAFKA_BROKERS: kafka:9092
+      HMAC_SECRET: mediconnect-hmac-secret
+    depends_on: [postgres-prescriptions, kafka]
+    networks: [mediconnect-net]
+
+  iot-service:
+    build: ../services/iot-service
+    ports:
+      - "3005:3005"
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: mediconnect-token
+      INFLUX_ORG: mediconnect
+      INFLUX_BUCKET: telemetry
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+      KAFKA_BROKERS: kafka:9092
+    depends_on: [influxdb, mosquitto, kafka]
+    networks: [mediconnect-net]
+
+  audit-service:
+    build: ../services/audit-service
+    ports:
+      - "3006:3006"
+    environment:
+      POSTGRES_HOST: postgres-audit
+      POSTGRES_DB: audit_ledger_db
+      POSTGRES_USER: mediconnect
+      POSTGRES_PASSWORD: secret
+      KAFKA_BROKERS: kafka:9092
+      HMAC_SECRET: mediconnect-hmac-secret
+    depends_on: [postgres-audit, kafka]
+    networks: [mediconnect-net]
