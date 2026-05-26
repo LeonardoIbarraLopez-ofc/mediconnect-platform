@@ -1,19 +1,19 @@
 /**
  * Enrutador Principal del API Gateway
- * Define las rutas proxy hacia cada microservicio.
- * Cada ruta aplica los middlewares de autenticación y rate-limiting.
- * El Circuit Breaker se evalúa antes de hacer el proxy al servicio destino.
- * En producción se puede usar http-proxy-middleware para el forwarding real.
+ * Hace proxy real de cada request hacia el microservicio correspondiente
+ * usando http-proxy-middleware. El Circuit Breaker evalúa la disponibilidad
+ * del servicio destino antes de cada request, y registra éxitos/fallos
+ * según el status code de la respuesta upstream.
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { rateLimitMiddleware } from '../middleware/rate-limit.middleware';
 import { isAvailable, recordFailure, recordSuccess } from '../middleware/circuit-breaker.middleware';
 
 const router = Router();
 
-// URLs de los microservicios (en producción vienen de variables de entorno)
 const SERVICES = {
   appointment: process.env.APPOINTMENT_SERVICE_URL || 'http://appointment-service:3001',
   telemedicine: process.env.TELEMEDICINE_SERVICE_URL || 'http://telemedicine-service:3002',
@@ -21,39 +21,48 @@ const SERVICES = {
   prescription: process.env.PRESCRIPTION_SERVICE_URL || 'http://prescription-service:3004',
   iot: process.env.IOT_SERVICE_URL || 'http://iot-service:3005',
   audit: process.env.AUDIT_SERVICE_URL || 'http://audit-service:3006',
-};
+} as const;
 
-// Proxy helper que aplica Circuit Breaker
-async function proxyRequest(
-  serviceName: keyof typeof SERVICES,
-  req: Request,
-  res: Response
-): Promise<void> {
-  if (!isAvailable(serviceName)) {
-    res.status(503).json({ error: `Servicio ${serviceName} temporalmente no disponible` });
-    return;
-  }
+type ServiceName = keyof typeof SERVICES;
 
-  try {
-    // En producción: usar http-proxy-middleware o node-fetch para forwarding real
-    const targetUrl = `${SERVICES[serviceName]}${req.path}`;
-    res.json({ proxiedTo: targetUrl, status: 'forwarded' });
-    recordSuccess(serviceName);
-  } catch (error) {
-    recordFailure(serviceName);
-    res.status(502).json({ error: 'Error al comunicarse con el servicio' });
-  }
+function circuitBreakerGuard(serviceName: ServiceName) {
+  return (_req: Request, res: Response, next: NextFunction): void => {
+    if (!isAvailable(serviceName)) {
+      res.status(503).json({ error: `Servicio ${serviceName} temporalmente no disponible` });
+      return;
+    }
+    next();
+  };
 }
 
-// Rutas protegidas por JWT y Rate Limiting
+function makeProxy(serviceName: ServiceName) {
+  return createProxyMiddleware({
+    target: SERVICES[serviceName],
+    changeOrigin: true,
+    on: {
+      proxyRes: (proxyRes) => {
+        if (proxyRes.statusCode !== undefined && proxyRes.statusCode >= 500) {
+          recordFailure(serviceName);
+        } else {
+          recordSuccess(serviceName);
+        }
+      },
+      error: (_err, _req, res) => {
+        recordFailure(serviceName);
+        (res as Response).status(502).json({ error: 'Error al comunicarse con el servicio' });
+      },
+    },
+  });
+}
+
 router.use(authMiddleware);
 router.use(rateLimitMiddleware);
 
-router.all('/appointments/*', (req, res) => proxyRequest('appointment', req, res));
-router.all('/telemedicine/*', (req, res) => proxyRequest('telemedicine', req, res));
-router.all('/ehr/*', (req, res) => proxyRequest('ehr', req, res));
-router.all('/prescriptions/*', (req, res) => proxyRequest('prescription', req, res));
-router.all('/iot/*', (req, res) => proxyRequest('iot', req, res));
-router.all('/audit/*', (req, res) => proxyRequest('audit', req, res));
+router.use('/appointments', circuitBreakerGuard('appointment'), makeProxy('appointment'));
+router.use('/telemedicine', circuitBreakerGuard('telemedicine'), makeProxy('telemedicine'));
+router.use('/ehr', circuitBreakerGuard('ehr'), makeProxy('ehr'));
+router.use('/prescriptions', circuitBreakerGuard('prescription'), makeProxy('prescription'));
+router.use('/iot', circuitBreakerGuard('iot'), makeProxy('iot'));
+router.use('/audit', circuitBreakerGuard('audit'), makeProxy('audit'));
 
 export default router;

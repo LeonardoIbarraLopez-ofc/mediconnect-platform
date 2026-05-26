@@ -14,7 +14,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'mediconnect-secret';
 export interface AuthenticatedRequest extends Request {
   user?: {
     userId: string;
-    role: 'patient' | 'doctor' | 'admin';
+    role: 'patient' | 'doctor' | 'admin' | 'ministry_auditor';
     email: string;
   };
 }

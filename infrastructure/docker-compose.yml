@@ -37,6 +37,12 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     networks: [mediconnect-net]
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
 
   # ─── Broker MQTT para IoT ─────────────────────────────────────
   mosquitto:
@@ -44,6 +50,12 @@ services:
     ports:
       - "1883:1883"
     networks: [mediconnect-net]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 1883 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ─── Bases de Datos ───────────────────────────────────────────
   postgres-appointments:
@@ -55,6 +67,12 @@ services:
     volumes:
       - postgres-appointments-data:/var/lib/postgresql/data
     networks: [mediconnect-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediconnect -d appointments_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   postgres-prescriptions:
     image: postgres:16-alpine
@@ -65,6 +83,12 @@ services:
     volumes:
       - postgres-prescriptions-data:/var/lib/postgresql/data
     networks: [mediconnect-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediconnect -d prescriptions_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   postgres-audit:
     image: postgres:16-alpine
@@ -75,12 +99,24 @@ services:
     volumes:
       - postgres-audit-data:/var/lib/postgresql/data
     networks: [mediconnect-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediconnect -d audit_ledger_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   mongo-ehr:
     image: mongo:7.0
     volumes:
       - mongo-ehr-data:/data/db
     networks: [mediconnect-net]
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   influxdb:
     image: influxdb:2.7-alpine
@@ -96,6 +132,12 @@ services:
     volumes:
       - influxdb-iot-data:/var/lib/influxdb2
     networks: [mediconnect-net]
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # ─── Microservicios ───────────────────────────────────────────
   api-gateway:
@@ -110,7 +152,9 @@ services:
       PRESCRIPTION_SERVICE_URL: http://prescription-service:3004
       IOT_SERVICE_URL: http://iot-service:3005
       AUDIT_SERVICE_URL: http://audit-service:3006
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy
     networks: [mediconnect-net]
 
   appointment-service:
@@ -124,7 +168,11 @@ services:
       POSTGRES_PASSWORD: secret
       KAFKA_BROKERS: kafka:9092
       HMAC_SECRET: mediconnect-hmac-secret
-    depends_on: [postgres-appointments, kafka]
+    depends_on:
+      postgres-appointments:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks: [mediconnect-net]
 
   telemedicine-service:
@@ -134,7 +182,9 @@ services:
     environment:
       KAFKA_BROKERS: kafka:9092
       HMAC_SECRET: mediconnect-hmac-secret
-    depends_on: [kafka]
+    depends_on:
+      kafka:
+        condition: service_healthy
     networks: [mediconnect-net]
 
   ehr-service:
@@ -144,7 +194,11 @@ services:
     environment:
       MONGO_URI: mongodb://mongo-ehr:27017
       KAFKA_BROKERS: kafka:9092
-    depends_on: [mongo-ehr, kafka]
+    depends_on:
+      mongo-ehr:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks: [mediconnect-net]
 
   prescription-service:
@@ -158,7 +212,11 @@ services:
       POSTGRES_PASSWORD: secret
       KAFKA_BROKERS: kafka:9092
       HMAC_SECRET: mediconnect-hmac-secret
-    depends_on: [postgres-prescriptions, kafka]
+    depends_on:
+      postgres-prescriptions:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks: [mediconnect-net]
 
   iot-service:
@@ -172,7 +230,13 @@ services:
       INFLUX_BUCKET: telemetry
       MQTT_BROKER_URL: mqtt://mosquitto:1883
       KAFKA_BROKERS: kafka:9092
-    depends_on: [influxdb, mosquitto, kafka]
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks: [mediconnect-net]
 
   audit-service:
@@ -186,5 +250,9 @@ services:
       POSTGRES_PASSWORD: secret
       KAFKA_BROKERS: kafka:9092
       HMAC_SECRET: mediconnect-hmac-secret
-    depends_on: [postgres-audit, kafka]
+    depends_on:
+      postgres-audit:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks: [mediconnect-net]

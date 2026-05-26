@@ -7,6 +7,8 @@
  * Estados: CLOSED (normal) → OPEN (fallo) → HALF-OPEN (prueba recuperación).
  */
 
+import { logger } from '../logger';
+
 interface CircuitState {
   failures: number;
   lastFailureTime: number;
@@ -38,7 +40,7 @@ export function recordFailure(serviceName: string): void {
 
   if (circuit.failures >= FAILURE_THRESHOLD) {
     circuit.state = 'OPEN';
-    console.error(`[CircuitBreaker] Circuito ABIERTO para ${serviceName}`);
+    logger.error({ serviceName, failures: circuit.failures }, '[CircuitBreaker] Circuito ABIERTO');
   }
 }
 
