@@ -27,7 +27,7 @@ async function getDb(): Promise<Db> {
 }
 
 function getCollection(): Promise<Collection> {
-  return getDb().then((d) => d.collection('patient_histories'));
+  return getDb().then((d) => d.collection('medical_records'));
 }
 
 function docToEntity(doc: any): PatientHistory {
