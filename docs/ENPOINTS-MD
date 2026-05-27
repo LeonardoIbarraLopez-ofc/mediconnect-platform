@@ -1,0 +1,22 @@
+### A. Endpoints del `iot-service` (Puerto 3005)
+*   **Chequeo de Salud**:
+    *   `GET http://localhost:3005/health`
+    *   *Respuesta*: `{ "status": "ok", "service": "iot-service" }`
+*   **Obtener Historial de Telemetría**:
+    *   `GET http://localhost:3005/telemetry/patient/:patientId` (ej: `pat-101`)
+    *   *Respuesta*: Arreglo JSON con todas las lecturas de telemetría de glucosa, oxímetro y presión acumuladas en memoria.
+*   **Obtener la Última Métrica Recibida**:
+    *   `GET http://localhost:3005/telemetry/patient/:patientId/latest` (ej: `pat-101`)
+    *   *Respuesta*: Objeto JSON detallado de la última lectura simulada por los sensores médicos.
+
+
+### B. Endpoints del `audit-service` (Puerto 3006)
+*   **Chequeo de Salud**:
+    *   `GET http://localhost:3006/health`
+    *   *Respuesta*: `{ "status": "ok", "service": "audit-service" }`
+*   **Consultar Eventos del Ledger en un Rango de Secuencia**:
+    *   `GET http://localhost:3006/audit/events?from=1&to=10`
+    *   *Respuesta*: Lista paginada y ordenada de eventos firmados criptográficamente. Muestra la firma `hmacSignature` y el encadenamiento `previousEventHash` tipo Blockchain.
+*   **Consultar el Historial de Auditoría de un Paciente**:
+    *   `GET http://localhost:3006/audit/patient/:patientId/events` (ej: `pat-101`)
+    *   *Respuesta*: Lista con todos los eventos de auditoría regulatoria correspondientes a ese paciente en particular.
