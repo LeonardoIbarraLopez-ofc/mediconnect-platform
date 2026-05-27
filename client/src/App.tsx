@@ -204,6 +204,15 @@ export default function App() {
   const [systolic, setSystolic] = useState<number>(120);
   const [diastolic, setDiastolic] = useState<number>(80);
   const [telemetryHistory, setTelemetryHistory] = useState<number[]>([120, 118, 125, 122, 128, 131, 124, 135]);
+  
+  // Glucometer states (Glucosa en Sangre)
+  const [glucose, setGlucose] = useState<number>(110);
+  const [glucoseHistory, setGlucoseHistory] = useState<number[]>([105, 115, 110, 122, 118, 108, 125, 112]);
+
+  // Pulsioxímetro states (SpO2)
+  const [spo2, setSpo2] = useState<number>(98);
+  const [spo2History, setSpo2History] = useState<number[]>([98, 97, 98, 99, 97, 98, 98, 98]);
+
   const [criticalAlerts, setCriticalAlerts] = useState<any[]>([]);
 
   // Quality & Reviews States
@@ -301,43 +310,126 @@ export default function App() {
     }
   };
 
-  // VI & VII. Telemetría IoT Ingesta
+  // VI & VII. Telemetría IoT Ingesta (Tensiometro, Glucometro y Pulsioxímetro)
   const handlePublishTelemetry = () => {
-    const newHistory = [...telemetryHistory.slice(1), systolic];
-    setTelemetryHistory(newHistory);
+    // 1. Ingest y actualizar series de tiempo
+    const newBpHistory = [...telemetryHistory.slice(1), systolic];
+    setTelemetryHistory(newBpHistory);
+
+    const newGlucHistory = [...glucoseHistory.slice(1), glucose];
+    setGlucoseHistory(newGlucHistory);
+
+    const newSpo2History = [...spo2History.slice(1), spo2];
+    setSpo2History(newSpo2History);
 
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    let triggeredAlert = false;
+    let newLedgerEvents: AuditEvent[] = [];
+    let alertsToAdd: any[] = [];
 
+    // A. Tensiómetro: > 140 mmHg
     if (systolic > 140) {
-      // Trigger alarm
-      const alertId = 'ALT-' + Math.floor(Math.random() * 1000);
-      const newAlert = {
+      triggeredAlert = true;
+      const alertId = 'ALT-' + Math.floor(Math.random() * 1000 + 100);
+      alertsToAdd.push({
         id: alertId,
         patientId: selectedPatientId,
-        systolic,
-        diastolic,
+        type: 'Presión Arterial',
+        value: `${systolic}/${diastolic} mmHg`,
         timestamp: now,
-        msg: `Presión sistólica de ${systolic} mmHg supera el límite crítico predefinido (140 mmHg). Notificación enviada al cardiólogo.`
-      };
-      setCriticalAlerts(prev => [newAlert, ...prev]);
-
-      // Write to Ledger
-      const newSeq = ledger.length + 1;
+        msg: `Tensiómetro IoT: Presión sistólica de ${systolic} mmHg supera el rango normal (<140). Notificación enviada al especialista.`
+      });
+      
+      const newSeq = ledger.length + 1 + newLedgerEvents.length;
       const prevHash = btoa(ledger[ledger.length - 1].hmac).substring(0, 64);
       const hmac = 'e3b0c44298f' + Math.floor(Math.random() * 10000);
-      setLedger(prev => [
-        ...prev,
-        { seq: newSeq, type: 'alert.critical', service: 'iot-service', payload: JSON.stringify({ patientId: selectedPatientId, systolic, diastolic }), prevHash, hmac, timestamp: now }
-      ]);
+      newLedgerEvents.push({
+        seq: newSeq,
+        type: 'alert.critical',
+        service: 'iot-service',
+        payload: JSON.stringify({ patientId: selectedPatientId, device: 'tensiometro', systolic, diastolic, event: 'hipertension_critica' }),
+        prevHash,
+        hmac,
+        timestamp: now
+      });
+    }
+
+    // B. Glucómetro: < 50 o > 400 mg/dL
+    if (glucose < 50 || glucose > 400) {
+      triggeredAlert = true;
+      const alertId = 'ALT-' + Math.floor(Math.random() * 1000 + 300);
+      const conditionStr = glucose < 50 ? 'Hipoglucemia severa' : 'Hiperglucemia crítica';
+      alertsToAdd.push({
+        id: alertId,
+        patientId: selectedPatientId,
+        type: 'Glucosa en Sangre',
+        value: `${glucose} mg/dL`,
+        timestamp: now,
+        msg: `Glucómetro IoT: ${conditionStr} detectada (${glucose} mg/dL). Protocolo de emergencia endocrinológica activado.`
+      });
+
+      const newSeq = ledger.length + 1 + newLedgerEvents.length;
+      const prevHash = btoa(ledger[ledger.length - 1].hmac).substring(0, 64);
+      const hmac = 'd2a1b3c4f5e6' + Math.floor(Math.random() * 10000);
+      newLedgerEvents.push({
+        seq: newSeq,
+        type: 'alert.critical',
+        service: 'iot-service',
+        payload: JSON.stringify({ patientId: selectedPatientId, device: 'glucometro', glucose, event: 'glucosa_critica' }),
+        prevHash,
+        hmac,
+        timestamp: now
+      });
+    }
+
+    // C. Pulsioxímetro: < 90%
+    if (spo2 < 90) {
+      triggeredAlert = true;
+      const alertId = 'ALT-' + Math.floor(Math.random() * 1000 + 500);
+      alertsToAdd.push({
+        id: alertId,
+        patientId: selectedPatientId,
+        type: 'Saturación SpO2',
+        value: `${spo2}%`,
+        timestamp: now,
+        msg: `Pulsioxímetro IoT: Hipoxia detectada (${spo2}% SpO2). Evento crítico alert.critical encolado en Kafka.`
+      });
+
+      const newSeq = ledger.length + 1 + newLedgerEvents.length;
+      const prevHash = btoa(ledger[ledger.length - 1].hmac).substring(0, 64);
+      const hmac = 'c3d4e5f6a7b8' + Math.floor(Math.random() * 10000);
+      newLedgerEvents.push({
+        seq: newSeq,
+        type: 'alert.critical',
+        service: 'iot-service',
+        payload: JSON.stringify({ patientId: selectedPatientId, device: 'pulsioximetro', spo2, event: 'hipoxia_critica' }),
+        prevHash,
+        hmac,
+        timestamp: now
+      });
+    }
+
+    // Inyectar alertas y actualizar ledger
+    if (alertsToAdd.length > 0) {
+      setCriticalAlerts(prev => [...alertsToAdd, ...prev]);
+    }
+    if (newLedgerEvents.length > 0) {
+      setLedger(prev => [...prev, ...newLedgerEvents]);
     } else {
-      // Normal monitoring ingestion
+      // Registrar telemetría normal
       const newSeq = ledger.length + 1;
       const prevHash = btoa(ledger[ledger.length - 1].hmac).substring(0, 64);
       const hmac = 'a1f3e5c7b8d' + Math.floor(Math.random() * 10000);
       setLedger(prev => [
         ...prev,
-        { seq: newSeq, type: 'session.ended', service: 'telemedicine-service', payload: JSON.stringify({ patientId: selectedPatientId, systolic, diastolic, status: 'NORMAL' }), prevHash, hmac, timestamp: now }
+        { seq: newSeq, type: 'session.ended', service: 'telemedicine-service', payload: JSON.stringify({ patientId: selectedPatientId, status: 'NORMAL_TELEMETRY' }), prevHash, hmac, timestamp: now }
       ]);
+    }
+
+    if (triggeredAlert) {
+      showToast(`¡Lectura MQTT procesada! Se generaron ${alertsToAdd.length} alertas críticas en el sistema.`, 'error');
+    } else {
+      showToast('Lectura MQTT ingerida con éxito en InfluxDB. Parámetros normales.', 'success');
     }
   };
 
@@ -404,50 +496,62 @@ export default function App() {
     });
   };
 
-  // SVG time-series BP trend chart
-  const renderSvgTrend = () => {
+  // Reusable Multi-Chart SVG Plotter for medical sensor telemetries
+  const renderSvgChart = (history: number[], minVal: number, maxVal: number, threshold: number, isLower: boolean, label: string, color: string) => {
     const width = 500;
     const height = 180;
     const padding = 30;
-    const pointsCount = telemetryHistory.length;
-    const maxVal = 180;
-    const minVal = 90;
+    const pointsCount = history.length;
     
     const getX = (idx: number) => padding + (idx * (width - padding * 2)) / (pointsCount - 1);
     const getY = (val: number) => height - padding - ((val - minVal) * (height - padding * 2)) / (maxVal - minVal);
     
-    const pathD = telemetryHistory.map((val, idx) => `${idx === 0 ? 'M' : 'L'} ${getX(idx)} ${getY(val)}`).join(' ');
-    const thresholdY = getY(140);
+    const pathD = history.map((val, idx) => `${idx === 0 ? 'M' : 'L'} ${getX(idx)} ${getY(val)}`).join(' ');
+    const thresholdY = getY(threshold);
 
     return (
-      <svg viewBox={`0 0 ${width} ${height}`} className="svg-trend" style={{ width: '100%', height: '100%', minHeight: '160px' }}>
-        <line x1={padding} y1={getY(160)} x2={width - padding} y2={getY(160)} stroke="#212c3d" strokeDasharray="3 3" />
-        <line x1={padding} y1={getY(140)} x2={width - padding} y2={getY(140)} stroke="rgba(255, 51, 102, 0.4)" strokeDasharray="3 3" />
-        <line x1={padding} y1={getY(120)} x2={width - padding} y2={getY(120)} stroke="#212c3d" strokeDasharray="3 3" />
-        <line x1={padding} y1={getY(100)} x2={width - padding} y2={getY(100)} stroke="#212c3d" strokeDasharray="3 3" />
+      <svg viewBox={`0 0 ${width} ${height}`} className="svg-trend" style={{ width: '100%', height: '100%', minHeight: '130px' }}>
+        <line x1={padding} y1={getY(maxVal - (maxVal - minVal) * 0.25)} x2={width - padding} y2={getY(maxVal - (maxVal - minVal) * 0.25)} stroke="#1e2938" strokeDasharray="3 3" />
+        <line x1={padding} y1={getY(maxVal - (maxVal - minVal) * 0.5)} x2={width - padding} y2={getY(maxVal - (maxVal - minVal) * 0.5)} stroke="#1e2938" strokeDasharray="3 3" />
+        <line x1={padding} y1={getY(maxVal - (maxVal - minVal) * 0.75)} x2={width - padding} y2={getY(maxVal - (maxVal - minVal) * 0.75)} stroke="#1e2938" strokeDasharray="3 3" />
         
-        <line x1={padding} y1={thresholdY} x2={width - padding} y2={thresholdY} stroke="#ff3366" strokeWidth="2" strokeDasharray="5 5" />
-        <text x={padding + 10} y={thresholdY - 6} fill="#ff3366" fontSize="10" fontFamily="monospace" fontWeight="700">LÍMITE CRÍTICO: 140 mmHg</text>
+        {/* Threshold line */}
+        <line x1={padding} y1={thresholdY} x2={width - padding} y2={thresholdY} stroke="#ff3366" strokeWidth="2" strokeDasharray="4 4" />
+        <text x={padding + 10} y={isLower ? thresholdY + 12 : thresholdY - 6} fill="#ff3366" fontSize="9" fontFamily="monospace" fontWeight="700">
+          {label}: {threshold}
+        </text>
 
-        <path d={pathD} fill="none" stroke="#00f0ff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 5px rgba(0, 240, 255, 0.4))' }} />
+        {/* Data curve */}
+        <path d={pathD} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ filter: `drop-shadow(0 0 5px ${color}44)` }} />
 
-        {telemetryHistory.map((val, idx) => (
-          <circle key={idx} cx={getX(idx)} cy={getY(val)} r="5" fill={val > 140 ? '#ff3366' : '#00f0ff'} stroke="#0d131a" strokeWidth="2" />
-        ))}
+        {/* Points */}
+        {history.map((val, idx) => {
+          const isCrit = isLower ? val < threshold : val > threshold;
+          return (
+            <circle key={idx} cx={getX(idx)} cy={getY(val)} r="4.5" fill={isCrit ? '#ff3366' : color} stroke="#0d131a" strokeWidth="2" />
+          );
+        })}
 
-        <text x={padding} y={height - 10} fill="#8b949e" fontSize="9" fontFamily="monospace">Ayer</text>
-        <text x={width - padding - 20} y={height - 10} fill="#8b949e" fontSize="9" fontFamily="monospace">Ahora</text>
+        <text x={padding} y={height - 8} fill="#8b949e" fontSize="9" fontFamily="monospace">Ayer</text>
+        <text x={width - padding - 20} y={height - 8} fill="#8b949e" fontSize="9" fontFamily="monospace">Ahora</text>
       </svg>
     );
   };
 
   return (
-    <div className="medi-dashboard" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="medi-dashboard" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      
+      {/* ─── AMBIENT RADIAL MESH BACKGROUND ─── */}
+      <div className="ambient-bg">
+        <div className="ambient-orb-1"></div>
+        <div className="ambient-orb-2"></div>
+        <div className="ambient-orb-3"></div>
+      </div>
       
       {/* ─── HEADER DE ALTA FIDELIDAD ─── */}
       <header className="dashboard-header">
         <div className="header-brand">
-          <div className="brand-badge">Hackathon Release v3.5</div>
+          <div className="brand-badge">PRODUCTION RELEASE v3.5</div>
           <h1 className="brand-title">MediConnect <span>S.A.S.</span></h1>
           <span className="badge-active" style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
             <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#39d353' }}></span>
@@ -698,54 +802,137 @@ export default function App() {
 
         {/* ─── TAB 2: TELEMETRÍA IOT & CALIDAD (MVPs VI, VII, VIII) ─── */}
         {activeTab === 'iot' && (
-          <div className="tab-content" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className="tab-content" style={{ gridTemplateColumns: '1.2fr 0.8fr' }}>
             
             {/* Lado Izquierdo: Telemetría y Alertas (VI, VII) */}
-            <section className="glass-panel">
-              <h2 className="panel-title"><IconIoT /> Monitoreo Crónico IoT & Alertas Críticas</h2>
+            <section className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <h2 className="panel-title" style={{ margin: 0, paddingBottom: '12px' }}><IconIoT /> Monitoreo Crónico IoT & Alertas Críticas</h2>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                <div className="input-group">
+              {/* Controles de Entrada de Sensores (MQTT Simulación) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', background: 'var(--bg-secondary)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                
+                <div className="input-group" style={{ margin: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="input-label">Presión Sistólica</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', color: systolic > 140 ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 'bold' }}>{systolic} mmHg</span>
+                    <span className="input-label" style={{ fontSize: '0.75rem' }}>Presión Sistólica</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: systolic > 140 ? 'var(--accent-red)' : 'var(--accent-cyan)', fontWeight: 'bold', fontSize: '0.8rem' }}>{systolic} mmHg</span>
                   </div>
                   <input type="range" min="95" max="185" value={systolic} onChange={(e) => setSystolic(parseInt(e.target.value))} className="range-control" style={{ accentColor: systolic > 140 ? 'var(--accent-red)' : 'var(--accent-cyan)' }} />
                 </div>
 
-                <div className="input-group">
+                <div className="input-group" style={{ margin: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span className="input-label">Presión Diastólica</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>{diastolic} mmHg</span>
+                    <span className="input-label" style={{ fontSize: '0.75rem' }}>Presión Diastólica</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent-cyan)', fontWeight: 'bold', fontSize: '0.8rem' }}>{diastolic} mmHg</span>
                   </div>
                   <input type="range" min="60" max="110" value={diastolic} onChange={(e) => setDiastolic(parseInt(e.target.value))} className="range-control" />
                 </div>
-              </div>
 
-              <div className="graph-container" style={{ marginBottom: '15px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span className="input-label" style={{ margin: 0 }}>Historial (Series de Tiempo)</span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Tópico MQTT: mediconnect/patients/{selectedPatientId}/blood_pressure</span>
+                <div className="input-group" style={{ margin: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="input-label" style={{ fontSize: '0.75rem' }}>Glucosa en Sangre</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: (glucose < 50 || glucose > 400) ? 'var(--accent-red)' : 'var(--accent-purple)', fontWeight: 'bold', fontSize: '0.8rem' }}>{glucose} mg/dL</span>
+                  </div>
+                  <input type="range" min="30" max="450" value={glucose} onChange={(e) => setGlucose(parseInt(e.target.value))} className="range-control" style={{ accentColor: (glucose < 50 || glucose > 400) ? 'var(--accent-red)' : 'var(--accent-purple)' }} />
                 </div>
-                {renderSvgTrend()}
+
+                <div className="input-group" style={{ margin: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span className="input-label" style={{ fontSize: '0.75rem' }}>Saturación de Oxígeno (SpO2)</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', color: spo2 < 90 ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 'bold', fontSize: '0.8rem' }}>{spo2}%</span>
+                  </div>
+                  <input type="range" min="75" max="100" value={spo2} onChange={(e) => setSpo2(parseInt(e.target.value))} className="range-control" style={{ accentColor: spo2 < 90 ? 'var(--accent-red)' : 'var(--accent-green)' }} />
+                </div>
+
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>MQTT Broker: mqtt://mosquitto:1883</span>
+              {/* Publicar Lectura vía MQTT */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  📡 <code>mqtt://mosquitto:1883</code> | Tópico: <code>mediconnect/patients/{selectedPatientId}/telemetry</code>
+                </span>
                 <button className="btn btn-cyan" onClick={handlePublishTelemetry}>Publicar Lectura vía MQTT</button>
               </div>
 
+              {/* Cuadrícula de Sensores IoT en Tiempo Real */}
+              <div className="iot-sensor-grid">
+                
+                {/* 1. Tensiómetro */}
+                <div className="sensor-metric-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px', background: 'rgba(12, 18, 26, 0.4)', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <div className="sensor-metric-label">💓 Tensiómetro IoT</div>
+                    <div className="sensor-metric-value" style={{ color: systolic > 140 ? 'var(--accent-red)' : 'var(--accent-cyan)' }}>
+                      {systolic}/{diastolic} <span style={{ fontSize: '0.75rem' }}>mmHg</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className={`sensor-status-badge ${systolic > 140 ? 'critical' : 'normal'}`}>
+                      {systolic > 140 ? '⚠️ CRÍTICO' : '✓ NORMAL'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. Glucómetro */}
+                <div className="sensor-metric-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px', background: 'rgba(12, 18, 26, 0.4)', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <div className="sensor-metric-label">🩸 Glucómetro IoT</div>
+                    <div className="sensor-metric-value" style={{ color: (glucose < 50 || glucose > 400) ? 'var(--accent-red)' : 'var(--accent-purple)' }}>
+                      {glucose} <span style={{ fontSize: '0.75rem' }}>mg/dL</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className={`sensor-status-badge ${(glucose < 50 || glucose > 400) ? 'critical' : 'normal'}`}>
+                      {glucose < 50 ? '⚠️ HIPOGLUCEMIA' : glucose > 400 ? '⚠️ HIPERGLUCEMIA' : '✓ NORMAL'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Pulsioxímetro */}
+                <div className="sensor-metric-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '120px', background: 'rgba(12, 18, 26, 0.4)', border: '1px solid var(--border-color)' }}>
+                  <div>
+                    <div className="sensor-metric-label">🫁 Pulsioxímetro IoT</div>
+                    <div className="sensor-metric-value" style={{ color: spo2 < 90 ? 'var(--accent-red)' : 'var(--accent-green)' }}>
+                      {spo2} <span style={{ fontSize: '0.75rem' }}>% SpO2</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className={`sensor-status-badge ${spo2 < 90 ? 'critical' : 'normal'}`}>
+                      {spo2 < 90 ? '⚠️ HIPOXIA' : '✓ NORMAL'}
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Gráficos de Tendencias en Tiempo Real */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginTop: '10px' }}>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '5px', textAlign: 'center', fontWeight: 'bold' }}>TENDENCIA PRESIÓN</div>
+                  {renderSvgChart(telemetryHistory, 90, 190, 140, false, 'Límite', 'var(--accent-cyan)')}
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '5px', textAlign: 'center', fontWeight: 'bold' }}>TENDENCIA GLUCOSA</div>
+                  {renderSvgChart(glucoseHistory, 30, 450, 400, false, 'Límite', 'var(--accent-purple)')}
+                </div>
+                <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '5px', textAlign: 'center', fontWeight: 'bold' }}>TENDENCIA OXÍGENO</div>
+                  {renderSvgChart(spo2History, 70, 105, 90, true, 'Límite', 'var(--accent-green)')}
+                </div>
+              </div>
+
+              {/* Historial de Alertas Críticas (alert.critical Kafka) */}
               {criticalAlerts.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                  <div className="input-label">Historial de Alertas Críticas (alert.critical Kafka)</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '100px', overflowY: 'auto' }}>
+                <div style={{ marginTop: '15px' }}>
+                  <div className="input-label" style={{ color: 'var(--accent-red)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🚨 Registro de Alertas Críticas (Kafka alert.critical)</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '120px', overflowY: 'auto' }}>
                     {criticalAlerts.map(a => (
-                      <div key={a.id} className="alert-card">
+                      <div key={a.id} className="alert-card" style={{ borderColor: 'rgba(255, 51, 102, 0.4)', background: 'rgba(255, 51, 102, 0.05)', padding: '10px', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                          <span>⚠️ ALERTA CRÍTICA DE HIPERTENSIÓN</span>
-                          <span>{a.id}</span>
+                          <span style={{ color: 'var(--accent-red)' }}>⚠️ {a.type.toUpperCase()}: {a.value}</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{a.id}</span>
                         </div>
-                        <div style={{ fontSize: '0.75rem', marginTop: '3px' }}>{a.msg}</div>
+                        <div style={{ fontSize: '0.75rem', marginTop: '3px', color: 'var(--text-primary)' }}>{a.msg}</div>
                       </div>
                     ))}
                   </div>

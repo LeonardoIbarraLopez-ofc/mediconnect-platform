@@ -1,10 +1,10 @@
 /* CSS: MediConnect S.A.S. Professional Cyberpunk-Medical Theme */
 
 :root {
-  --bg-primary: #05080c;
-  --bg-secondary: #0c1219;
-  --bg-tertiary: #121a24;
-  --border-color: #1f2a38;
+  --bg-primary: #04070b;
+  --bg-secondary: #0a0f16;
+  --bg-tertiary: #0f1722;
+  --border-color: #1e2938;
   --border-glow: rgba(0, 240, 255, 0.2);
   --text-primary: #f0f6fc;
   --text-secondary: #8b949e;
@@ -30,24 +30,115 @@ body {
   font-family: var(--font-main);
   overflow-x: hidden;
   min-height: 100vh;
-  /* Premium futuristic mesh background */
   background-color: var(--bg-primary);
-  background-image: 
-    radial-gradient(circle at 15% 20%, rgba(0, 240, 255, 0.06) 0%, transparent 45%), 
-    radial-gradient(circle at 85% 75%, rgba(171, 125, 246, 0.06) 0%, transparent 45%),
-    radial-gradient(circle at 50% 50%, rgba(0, 102, 204, 0.03) 0%, transparent 60%);
-  background-attachment: fixed;
+  position: relative;
 }
 
-/* Glassmorphism Panels */
+/* Ambient 3D Glowing Orbs & Grid Background */
+.ambient-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  background-image: 
+    radial-gradient(circle at 50% -20%, rgba(0, 102, 204, 0.1) 0%, transparent 60%),
+    radial-gradient(circle at 10% 90%, rgba(0, 240, 255, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* 3D perspective cyber-mesh grid */
+.ambient-bg::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  perspective: 500px;
+  transform: perspective(600px) rotateX(65deg) translateY(-200px) scale(2.2);
+  transform-origin: top center;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 80%);
+  z-index: -1;
+  opacity: 0.75;
+  animation: grid-scroll 25s linear infinite;
+}
+
+@keyframes grid-scroll {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 500px; }
+}
+
+.ambient-orb-1 {
+  position: absolute;
+  top: -10%;
+  left: 20%;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.12) 0%, transparent 70%);
+  filter: blur(100px);
+  animation: float-slow-1 25s ease infinite alternate;
+}
+
+.ambient-orb-2 {
+  position: absolute;
+  bottom: 10%;
+  right: 15%;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(171, 125, 246, 0.11) 0%, transparent 70%);
+  filter: blur(120px);
+  animation: float-slow-2 30s ease infinite alternate;
+}
+
+.ambient-orb-3 {
+  position: absolute;
+  top: 40%;
+  left: -10%;
+  width: 450px;
+  height: 450px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 102, 204, 0.09) 0%, transparent 70%);
+  filter: blur(110px);
+  animation: float-slow-3 28s ease infinite alternate;
+}
+
+@keyframes float-slow-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(50px, 40px) scale(1.15); }
+}
+
+@keyframes float-slow-2 {
+  0% { transform: translate(0, 0) scale(1.1); }
+  100% { transform: translate(-60px, -50px) scale(0.9); }
+}
+
+@keyframes float-slow-3 {
+  0% { transform: translate(0, 0) scale(0.95); }
+  100% { transform: translate(40px, -30px) scale(1.1); }
+}
+
+/* Glassmorphism Panels with Interactive 3D Depth */
 .glass-panel {
-  background: rgba(12, 18, 25, 0.7);
-  backdrop-filter: blur(14px);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
+  background: rgba(12, 18, 26, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(30, 41, 56, 0.8);
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.5);
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-shadow: 0 15px 35px 0 rgba(0, 0, 0, 0.65);
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transition: transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.3s, box-shadow 0.3s;
   position: relative;
   overflow: hidden;
 }
@@ -59,13 +150,15 @@ body {
   left: 0;
   width: 100%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.35), transparent);
 }
 
 .glass-panel:hover {
-  border-color: rgba(0, 240, 255, 0.35);
-  box-shadow: 0 12px 40px 0 rgba(0, 240, 255, 0.08);
-  transform: translateY(-2px);
+  border-color: rgba(0, 240, 255, 0.45);
+  box-shadow: 
+    0 20px 40px 0 rgba(0, 0, 0, 0.7),
+    0 0 25px rgba(0, 240, 255, 0.12);
+  transform: translateY(-4px) rotateX(1.5deg) rotateY(-1.5deg) scale(1.008);
 }
 
 /* Animations */
@@ -156,8 +249,8 @@ body {
 /* Navigation Tabs */
 .tab-navigator {
   display: flex;
-  background: rgba(12, 18, 25, 0.8);
-  backdrop-filter: blur(10px);
+  background: rgba(12, 18, 25, 0.7);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
   padding: 6px;
   border-radius: 12px;
@@ -197,7 +290,7 @@ body {
 
 /* Header styling */
 .dashboard-header {
-  background: linear-gradient(180deg, rgba(7, 11, 16, 0.8) 0%, rgba(5, 8, 12, 0) 100%);
+  background: linear-gradient(180deg, rgba(7, 11, 16, 0.7) 0%, rgba(5, 8, 12, 0) 100%);
   padding: 24px 40px;
   display: flex;
   justify-content: space-between;
@@ -345,7 +438,6 @@ body {
   box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
 }
 
-/* Layout aligner for Date/Time inputs in schedule appointment */
 .datetime-row {
   display: flex;
   gap: 12px;
@@ -356,7 +448,7 @@ body {
 
 .datetime-row input {
   flex: 1;
-  min-width: 0; /* Prevents overflow in flex row */
+  min-width: 0;
 }
 
 /* Buttons */
@@ -624,6 +716,66 @@ body {
   font-family: var(--font-mono);
   color: var(--accent-purple);
   word-break: break-all;
+}
+
+/* Multi-chart grid for IoT Telemetry */
+.iot-sensor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 15px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+
+@media (max-width: 900px) {
+  .iot-sensor-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sensor-metric-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 15px;
+  text-align: center;
+}
+
+.sensor-metric-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.sensor-metric-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent-cyan);
+}
+
+.sensor-status-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+
+.sensor-status-badge.normal {
+  background: rgba(57, 211, 83, 0.1);
+  color: var(--accent-green);
+  border: 1px solid var(--accent-green);
+}
+
+.sensor-status-badge.critical {
+  background: rgba(255, 51, 102, 0.1);
+  color: var(--accent-red);
+  border: 1px solid var(--accent-red);
+  animation: pulse-glow 2s infinite;
 }
 
 /* Custom Scroll */
