@@ -6,8 +6,8 @@
  * para que los servicios interesados (audit, notification) reaccionen.
  */
 
-import { AppointmentStatus, Appointment } from '../entities/appointment.entity';
-import { AppointmentRepository } from '../repositories/appointment.repository';
+import { AppointmentStatus, Appointment } from '../entities/appointment.entity.ts';
+import { AppointmentRepository } from '../repositories/appointment.repository.ts';
 
 interface EventPublisher {
   publish(topic: string, event: object): Promise<void>;

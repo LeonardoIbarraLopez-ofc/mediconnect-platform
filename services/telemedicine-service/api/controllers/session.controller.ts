@@ -8,10 +8,10 @@
  */
 
 import { Request, Response } from 'express';
-import { StartSessionUseCase } from '../../domain/use-cases/start-session.usecase';
-import { EndSessionUseCase } from '../../domain/use-cases/end-session.usecase';
-import { WebRTCServer } from '../../infrastructure/webrtc/webrtc.server';
-import { S3StorageService } from '../../infrastructure/storage/s3.client';
+import { StartSessionUseCase } from '../../domain/use-cases/start-session.usecase.ts';
+import { EndSessionUseCase } from '../../domain/use-cases/end-session.usecase.ts';
+import { WebRTCServer } from '../../infrastructure/webrtc/webrtc.server.ts';
+import { S3StorageService } from '../../infrastructure/storage/s3.client.ts';
 
 const webRTCServer = new WebRTCServer();
 const storageService = new S3StorageService();

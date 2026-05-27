@@ -5,7 +5,7 @@
  * (estado, URLs, timestamps) se guardan en una base de datos relacional.
  */
 
-import { TeleconsultationSession } from '../entities/session.entity';
+import { TeleconsultationSession } from '../entities/session.entity.ts';
 
 export interface SessionRepository {
   findById(id: string): Promise<TeleconsultationSession | null>;

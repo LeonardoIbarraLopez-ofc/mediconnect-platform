@@ -9,8 +9,8 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { Appointment } from '../entities/appointment.entity';
-import { AppointmentRepository } from '../repositories/appointment.repository';
+import { Appointment } from '../entities/appointment.entity.ts';
+import { AppointmentRepository } from '../repositories/appointment.repository.ts';
 
 interface CreateAppointmentInput {
   patientId: string;

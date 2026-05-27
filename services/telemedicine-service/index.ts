@@ -7,7 +7,7 @@
  */
 
 import express from 'express';
-import { startSession, endSession } from './api/controllers/session.controller';
+import { startSession, endSession } from './api/controllers/session.controller.ts';
 
 const app = express();
 const PORT = process.env.PORT || 3002;

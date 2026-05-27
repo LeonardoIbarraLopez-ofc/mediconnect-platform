@@ -7,8 +7,8 @@
  */
 
 import { Pool } from 'pg';
-import { Appointment, AppointmentStatus } from '../../domain/entities/appointment.entity';
-import { AppointmentRepository } from '../../domain/repositories/appointment.repository';
+import { Appointment, AppointmentStatus } from '../../domain/entities/appointment.entity.ts';
+import { AppointmentRepository } from '../../domain/repositories/appointment.repository.ts';
 
 const pool = new Pool({
   host: process.env.POSTGRES_HOST || 'localhost',

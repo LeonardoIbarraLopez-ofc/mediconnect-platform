@@ -13,10 +13,10 @@
  */
 
 import { Request, Response } from 'express';
-import { CreateAppointmentUseCase } from '../../domain/use-cases/create-appointment.usecase';
-import { UpdateAppointmentStatusUseCase } from '../../domain/use-cases/update-appointment-status.usecase';
-import { PostgresAppointmentRepository } from '../../infrastructure/db/postgres.client';
-import { KafkaAppointmentProducer } from '../../infrastructure/messaging/kafka.producer';
+import { CreateAppointmentUseCase } from '../../domain/use-cases/create-appointment.usecase.ts';
+import { UpdateAppointmentStatusUseCase } from '../../domain/use-cases/update-appointment-status.usecase.ts';
+import { PostgresAppointmentRepository } from '../../infrastructure/db/postgres.client.ts';
+import { KafkaAppointmentProducer } from '../../infrastructure/messaging/kafka.producer.ts';
 
 const repository = new PostgresAppointmentRepository();
 const producer = new KafkaAppointmentProducer();

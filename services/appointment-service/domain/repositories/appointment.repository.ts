@@ -6,7 +6,7 @@
  * modificar el dominio (principio de inversión de dependencias - Clean Architecture).
  */
 
-import { Appointment } from '../entities/appointment.entity';
+import { Appointment } from '../entities/appointment.entity.ts';
 
 export interface AppointmentRepository {
   findById(id: string): Promise<Appointment | null>;

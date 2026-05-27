@@ -13,7 +13,7 @@ import {
   getAppointment,
   getPatientAppointments,
   updateAppointmentStatus,
-} from './api/controllers/appointment.controller';
+} from './api/controllers/appointment.controller.ts';
 
 const app = express();
 const PORT = process.env.PORT || 3001;

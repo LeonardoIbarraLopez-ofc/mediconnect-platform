@@ -7,8 +7,8 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { TeleconsultationSession } from '../entities/session.entity';
-import { SessionRepository } from '../repositories/session.repository';
+import { TeleconsultationSession } from '../entities/session.entity.ts';
+import { SessionRepository } from '../repositories/session.repository.ts';
 
 interface WebRTCServer {
   createRoom(sessionId: string): Promise<{ roomToken: string; iceServers: object[] }>;

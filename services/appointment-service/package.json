@@ -4,7 +4,7 @@
   "description": "Microservicio de agendamiento y gestión de estados de citas médicas. Persistencia: PostgreSQL. Mensajería: Kafka.",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev index.ts",
+    "dev": "ts-node-dev --transpile-only --respawn index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest"

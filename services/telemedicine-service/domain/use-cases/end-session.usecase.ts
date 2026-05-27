@@ -8,7 +8,7 @@
  *    consuma el resumen y lo integre al historial clínico del paciente.
  */
 
-import { SessionRepository } from '../repositories/session.repository';
+import { SessionRepository } from '../repositories/session.repository.ts';
 
 interface StorageService {
   uploadRecording(sessionId: string, fileBuffer: Buffer): Promise<string>;
