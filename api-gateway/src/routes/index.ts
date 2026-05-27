@@ -4,6 +4,10 @@
  * usando http-proxy-middleware. El Circuit Breaker evalúa la disponibilidad
  * del servicio destino antes de cada request, y registra éxitos/fallos
  * según el status code de la respuesta upstream.
+ *
+ * Nota sobre pathRewrite: cuando Express monta router.use('/appointments', proxy),
+ * extrae el prefijo antes de pasarlo al middleware. El pathRewrite lo restaura
+ * para que el servicio downstream reciba la ruta completa.
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
@@ -23,6 +27,16 @@ const SERVICES = {
   audit: process.env.AUDIT_SERVICE_URL || 'http://audit-service:3006',
 } as const;
 
+// Ruta interna de cada servicio (puede diferir del prefijo del gateway)
+const SERVICE_PATHS: Record<keyof typeof SERVICES, string> = {
+  appointment: '/appointments',
+  telemedicine: '/sessions',
+  ehr: '/ehr',
+  prescription: '/prescriptions',
+  iot: '/telemetry',
+  audit: '/audit',
+};
+
 type ServiceName = keyof typeof SERVICES;
 
 function circuitBreakerGuard(serviceName: ServiceName) {
@@ -36,9 +50,12 @@ function circuitBreakerGuard(serviceName: ServiceName) {
 }
 
 function makeProxy(serviceName: ServiceName) {
+  const targetPath = SERVICE_PATHS[serviceName];
   return createProxyMiddleware({
     target: SERVICES[serviceName],
     changeOrigin: true,
+    // Restaura el prefijo que Express extrae al montar con router.use('/prefix', ...)
+    pathRewrite: (path) => `${targetPath}${path === '/' ? '' : path}`,
     on: {
       proxyRes: (proxyRes) => {
         if (proxyRes.statusCode !== undefined && proxyRes.statusCode >= 500) {
