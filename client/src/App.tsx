@@ -245,6 +245,94 @@ export default function App() {
   const [showIntegrityReport, setShowIntegrityReport] = useState<boolean>(false);
   const [showMutationError, setShowMutationError] = useState<boolean>(false);
 
+  // 📡 INTEGRACIÓN REAL CON EL API GATEWAY (PORT 3010)
+  const [backendConnected, setBackendConnected] = useState<boolean>(false);
+  const GATEWAY_URL = 'http://localhost:3010/api/v1';
+  const DEFAULT_TOKEN = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1LTAwMSIsInJvbGUiOiJkb2N0b3IiLCJlbWFpbCI6ImRvY3RvckBtZWRpY29ubmVjdC5ibyIsImlhdCI6MTc3OTg0MjY0OSwiZXhwIjoxNzgyNDM0NjQ5fQ.PPm49RlBpot976yrTM02p8pyckMHW4UfUK9Q6VbUIM8';
+
+  // Polling de telemetría IoT desde el Backend (vía API Gateway)
+  useEffect(() => {
+    let active = true;
+    const fetchLatestTelemetry = async () => {
+      try {
+        // Mapear PAT-001 -> pat-101, PAT-002 -> pat-102 para el simulador backend
+        const backendPatientId = selectedPatientId.toLowerCase().replace('pat-00', 'pat-10');
+        const res = await fetch(`${GATEWAY_URL}/iot/telemetry/patient/${backendPatientId}/latest`, {
+          headers: {
+            'Authorization': DEFAULT_TOKEN
+          }
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (active && data) {
+          setBackendConnected(true);
+          // Actualizar valores del frontend en tiempo real con datos del backend real
+          if (data.metricType === 'glucose') {
+            setGlucose(data.value);
+            setGlucoseHistory(prev => [...prev.slice(1), data.value]);
+          } else if (data.metricType === 'blood_pressure') {
+            setSystolic(data.value.systolic);
+            setDiastolic(data.value.diastolic);
+            setTelemetryHistory(prev => [...prev.slice(1), data.value.systolic]);
+          } else if (data.metricType === 'spo2') {
+            setSpo2(data.value);
+            setSpo2History(prev => [...prev.slice(1), data.value]);
+          }
+        }
+      } catch (err) {
+        // Fallback silencioso a simulación offline local de la PWA
+        setBackendConnected(false);
+      }
+    };
+
+    fetchLatestTelemetry();
+    const interval = setInterval(fetchLatestTelemetry, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [selectedPatientId]);
+
+  // Polling de auditoría inmutable forense (vía API Gateway)
+  useEffect(() => {
+    if (activeTab !== 'ledger') return;
+    let active = true;
+    const fetchBackendLedger = async () => {
+      try {
+        const res = await fetch(`${GATEWAY_URL}/audit/events?from=1&to=50`, {
+          headers: {
+            'Authorization': DEFAULT_TOKEN
+          }
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (active && data && data.events && data.events.length > 0) {
+          // Mapear los eventos de auditoría del backend al formato del frontend
+          const mappedEvents = data.events.map((e: any) => ({
+            seq: e.sequenceNumber,
+            type: e.type,
+            service: e.sourceService,
+            payload: JSON.stringify(e.payload),
+            prevHash: e.previousEventHash.substring(0, 32) + '...',
+            hmac: e.hmacSignature.substring(0, 16) + '...',
+            timestamp: new Date(e.occurredAt).toISOString().replace('T', ' ').substring(0, 19)
+          }));
+          setLedger(mappedEvents);
+          setBackendConnected(true);
+        }
+      } catch (err) {
+        setBackendConnected(false);
+      }
+    };
+
+    fetchBackendLedger();
+    const interval = setInterval(fetchBackendLedger, 6000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [activeTab]);
+
   // ─── LOGIC HANDLERS ───
 
   // I. Agenda Cita
@@ -555,10 +643,17 @@ export default function App() {
         <div className="header-brand">
           <div className="brand-badge">PRODUCTION RELEASE v3.5</div>
           <h1 className="brand-title">MediConnect <span>S.A.S.</span></h1>
-          <span className="badge-active" style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#39d353' }}></span>
-            SISTEMA NACIONAL INTEGRADO
-          </span>
+          {backendConnected ? (
+            <span className="badge-active" style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: 'rgba(0, 240, 255, 0.1)', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}>
+              <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-cyan)', boxShadow: '0 0 8px var(--accent-cyan)', animation: 'pulse 1.5s infinite' }}></span>
+              ⚡ API GATEWAY ONLINE (3010)
+            </span>
+          ) : (
+            <span className="badge-active" style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.1)', color: 'var(--text-secondary)' }}>
+              <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--text-secondary)' }}></span>
+              📴 MODO LOCAL PWA
+            </span>
+          )}
         </div>
 
         <div className="header-audit-box">

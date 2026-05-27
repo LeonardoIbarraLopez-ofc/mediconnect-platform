@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(pinoHttp({ logger }));
+app.use(pinoHttp({ logger: logger as any }));
 
 // Health check sin autenticación para los probes de Kubernetes/Docker
 app.get('/health', (_req, res) => {
