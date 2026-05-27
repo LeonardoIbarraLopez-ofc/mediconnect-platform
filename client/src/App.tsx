@@ -97,12 +97,14 @@ export default function App() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Real-time audit clock
+  // Real-time audit clock (24h format, no wrapping)
   const [localTime, setLocalTime] = useState<string>('');
   useEffect(() => {
     const updateTime = () => {
-      const date = new Date();
-      setLocalTime(date.toLocaleDateString() + ' ' + date.toLocaleTimeString());
+      const d = new Date();
+      const dateStr = d.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const timeStr = d.toLocaleTimeString('es-ES', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setLocalTime(`${dateStr}  ${timeStr}`);
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
@@ -1064,40 +1066,70 @@ export default function App() {
               </div>
             </section>
 
-            {/* Lado Derecho: Topología Git */}
+            {/* Lado Derecho: Topología de Microservicios en Tiempo Real */}
             <section className="glass-panel">
-              <h2 className="panel-title"><IconPortal /> Información de Arquitectura</h2>
+              <h2 className="panel-title"><IconShield /> Topología de Microservicios</h2>
               
+              {/* Git Flow Visual */}
+              <div className="input-label" style={{ marginBottom: '8px' }}>Control de Versiones (Git Flow)</div>
               <div className="git-node" style={{ borderLeftColor: '#f85149' }}>
                 <span className="badge-inactive" style={{ background: 'rgba(248,81,73,0.1)', color: '#ff7b72', borderColor: '#f85149' }}>main</span>
                 <span style={{ marginLeft: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Producción Estable</span>
+                <span className="svc-status online" style={{ marginLeft: 'auto' }}>
+                  <span className="status-dot"></span> v3.5.0
+                </span>
               </div>
               <div className="git-node" style={{ borderLeftColor: '#58a6ff' }}>
                 <span className="badge-active" style={{ background: 'rgba(88,166,255,0.1)', color: '#58a6ff', borderColor: '#58a6ff' }}>develop</span>
                 <span style={{ marginLeft: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Integración Continua</span>
+                <span className="svc-status online" style={{ marginLeft: 'auto' }}>
+                  <span className="status-dot"></span> CI/CD
+                </span>
               </div>
               <div className="git-node" style={{ borderLeftColor: 'var(--accent-cyan)', animation: 'pulse-glow 2s infinite' }}>
                 <span className="badge-active" style={{ background: 'rgba(0,240,255,0.1)', color: 'var(--accent-cyan)', borderColor: 'var(--accent-cyan)' }}>feat/dev4-client-pwa</span>
-                <span style={{ marginLeft: '10px', fontSize: '0.8rem', fontWeight: 'bold' }}>MI RAMA EN EDICIÓN</span>
+                <span style={{ marginLeft: '10px', fontSize: '0.8rem', fontWeight: 'bold' }}>EN EDICIÓN</span>
+                <span className="svc-status online" style={{ marginLeft: 'auto', color: 'var(--accent-cyan)', borderColor: 'rgba(0, 240, 255, 0.3)', background: 'rgba(0, 240, 255, 0.05)' }}>
+                  <span className="status-dot"></span> ACTIVE
+                </span>
               </div>
 
-              <div className="team-list" style={{ marginTop: '20px' }}>
-                <div className="input-label">Roles del Equipo</div>
-                <div className="team-member">
-                  <span>Dev 1 (Tech Lead)</span>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>api-gateway, kafka</span>
-                </div>
-                <div className="team-member">
-                  <span>Dev 2 (Senior Back)</span>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>appointments, WebRTC</span>
-                </div>
-                <div className="team-member">
-                  <span>Dev 3 (Senior Back)</span>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>COBOL, mongo ehr</span>
-                </div>
-                <div className="team-member active-dev">
-                  <span style={{ fontWeight: 'bold', color: 'var(--accent-cyan)' }}>🚀 Dev 4 (AI / Frontend)</span>
-                  <span style={{ color: 'var(--accent-cyan)', fontSize: '0.75rem' }}>PWA, iot, audit-service</span>
+              {/* Microservicios en Tiempo Real */}
+              <div style={{ marginTop: '20px' }}>
+                <div className="input-label" style={{ marginBottom: '8px' }}>Estado de Microservicios en Ejecución</div>
+
+                {[
+                  { name: 'api-gateway', port: ':3000', tech: 'Express + JWT', owner: 'Dev 1', color: '#58a6ff' },
+                  { name: 'appointment-service', port: ':3001', tech: 'Node.js + gRPC', owner: 'Dev 2', color: 'var(--accent-green)' },
+                  { name: 'telemedicine-service', port: ':3002', tech: 'WebRTC + HLS', owner: 'Dev 2', color: 'var(--accent-purple)' },
+                  { name: 'ehr-service', port: ':3003', tech: 'MongoDB + COBOL Bridge', owner: 'Dev 3', color: 'var(--accent-orange)' },
+                  { name: 'prescription-service', port: ':3004', tech: 'RSA-2048 + Kafka', owner: 'Dev 3', color: 'var(--accent-yellow)' },
+                  { name: 'iot-service', port: ':3005', tech: 'MQTT + InfluxDB', owner: 'Dev 4', color: 'var(--accent-cyan)' },
+                  { name: 'audit-service', port: ':3006', tech: 'PostgreSQL Ledger', owner: 'Dev 4', color: 'var(--accent-red)' },
+                ].map((svc, idx) => (
+                  <div key={svc.name} className="team-member" style={{ marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: svc.color, boxShadow: `0 0 6px ${svc.color}` }}></span>
+                        <span style={{ fontWeight: '600', fontSize: '0.85rem' }}>{svc.name}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{svc.port}</span>
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', paddingLeft: '16px' }}>{svc.tech} — {svc.owner}</span>
+                    </div>
+                    <span className="svc-status online">
+                      <span className="status-dot"></span> RUNNING
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Kafka Topics */}
+              <div style={{ marginTop: '20px', background: 'var(--bg-secondary)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div className="input-label" style={{ marginBottom: '6px', fontSize: '0.7rem' }}>📡 Kafka Topics Activos (Event Bus)</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {['appointment.created', 'prescription.issued', 'session.started', 'session.ended', 'alert.critical', 'ehr.synced', 'telemetry.ingested'].map(topic => (
+                    <span key={topic} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', background: 'rgba(0, 240, 255, 0.06)', border: '1px solid rgba(0, 240, 255, 0.15)', color: 'var(--accent-cyan)' }}>{topic}</span>
+                  ))}
                 </div>
               </div>
             </section>
