@@ -20,3 +20,7 @@
 *   **Consultar el Historial de Auditoría de un Paciente**:
     *   `GET http://localhost:3006/audit/patient/:patientId/events` (ej: `pat-101`)
     *   *Respuesta*: Lista con todos los eventos de auditoría regulatoria correspondientes a ese paciente en particular.
+
+### Endpoints de EHR:**
+- Verificación de salud: `GET http://localhost:3003/health`
+- Historial paciente: `GET http://localhost:3003/ehr/patient/123?nationalId=8765432`
