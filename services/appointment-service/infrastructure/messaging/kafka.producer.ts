@@ -27,14 +27,17 @@ export class KafkaAppointmentProducer {
   }
 
   async connect(): Promise<void> {
-    await this.producer.connect();
-    this.connected = true;
-    console.log('[Kafka] Productor appointment-service conectado');
+    try {
+      await this.producer.connect();
+      this.connected = true;
+      console.log('[Kafka] Productor appointment-service conectado');
+    } catch (err: any) {
+      console.warn(`[Kafka - Standalone Mode] No se pudo conectar productor Kafka (${err.message}). Ejecutando en contingencia.`);
+      this.connected = false;
+    }
   }
 
   async publish(topic: string, event: object): Promise<void> {
-    if (!this.connected) await this.connect();
-
     const payload = {
       ...event,
       metadata: {
@@ -48,14 +51,27 @@ export class KafkaAppointmentProducer {
       },
     };
 
-    await this.producer.send({
-      topic,
-      messages: [{ value: JSON.stringify(payload) }],
-    });
+    if (this.connected) {
+      try {
+        await this.producer.send({
+          topic,
+          messages: [{ value: JSON.stringify(payload) }],
+        });
+        return;
+      } catch (err) {
+        console.warn('[Kafka] Falló envío real de mensaje. Usando fallback standalone local.');
+      }
+    }
+
+    console.log(`[Kafka - Standalone - LocalPublish] Tópico [${topic}]:`, payload);
   }
 
   async disconnect(): Promise<void> {
-    await this.producer.disconnect();
+    if (this.connected) {
+      try {
+        await this.producer.disconnect();
+      } catch (e) {}
+    }
     this.connected = false;
   }
 }

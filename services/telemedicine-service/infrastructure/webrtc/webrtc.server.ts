@@ -9,7 +9,7 @@
 
 export interface WebRTCRoomConfig {
   roomToken: string;
-  iceServers: RTCIceServer[];
+  iceServers: any[];
 }
 
 export class WebRTCServer {

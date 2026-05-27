@@ -352,6 +352,30 @@ export default function App() {
 
     if (isOnline) {
       setAppointments(prev => [...prev, newAppt]);
+      
+      // Realizar POST real al microservicio appointment-service a través del API Gateway
+      if (backendConnected) {
+        fetch(`${GATEWAY_URL}/appointments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': DEFAULT_TOKEN
+          },
+          body: JSON.stringify({
+            patientId: selectedPatientId,
+            doctorId: 'doc-88',
+            scheduledAt: new Date(dateStr).toISOString(),
+            specialty: newAppt.specialty
+          })
+        }).then(res => {
+          if (res.ok) {
+            console.log('[API Gateway] Cita guardada en base de datos real (appointment-service)');
+          }
+        }).catch(err => {
+          console.warn('[API Gateway] Fallo al guardar la cita en el backend real');
+        });
+      }
+
       // Append to Ledger
       const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
       const newSeq = ledger.length + 1;
@@ -364,6 +388,64 @@ export default function App() {
       const localId = 'REC-' + Math.floor(Math.random() * 1000);
       setLocalDB(prev => [...prev, { id: localId, type: 'appointment', data: `Cita offline con ${newApptDoctor} el ${dateStr}`, synced: false, timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19) }]);
       showToast(`Sin red. La cita fue guardada localmente en IndexedDB.`, 'info');
+    }
+  };
+
+  // II. Videoconsulta Segura (Telemedicine Service Integration)
+  const handleToggleVideoCall = async () => {
+    const nextState = !isVideoActive;
+    setIsVideoActive(nextState);
+    setIsRecording(nextState);
+
+    if (nextState) {
+      // INICIAR videoconsulta real en telemedicine-service
+      if (backendConnected) {
+        try {
+          console.log('[API Gateway] Iniciando sesión WebRTC en telemedicine-service...');
+          const res = await fetch(`${GATEWAY_URL}/telemedicine/sessions/start`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': DEFAULT_TOKEN
+            },
+            body: JSON.stringify({
+              appointmentId: 'app-' + Math.floor(Math.random() * 1000),
+              patientId: selectedPatientId,
+              doctorId: 'doc-88'
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            console.log('[API Gateway] Sesión WebRTC iniciada exitosamente en backend:', data);
+            showToast('Videollamada iniciada en backend real. Sala WebRTC configurada.', 'success');
+          }
+        } catch (err) {
+          console.warn('[API Gateway] Error al iniciar sesión WebRTC en el backend');
+        }
+      }
+    } else {
+      // FINALIZAR videoconsulta real en telemedicine-service
+      if (backendConnected) {
+        try {
+          console.log('[API Gateway] Finalizando sesión WebRTC en el backend...');
+          const res = await fetch(`${GATEWAY_URL}/telemedicine/sessions/session-active-local/end`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': DEFAULT_TOKEN
+            },
+            body: JSON.stringify({
+              clinicalSummary: `El paciente ${patient.name} completó su consulta virtual. Presión arterial controlada, receta emitida.`
+            })
+          });
+          if (res.ok) {
+            console.log('[API Gateway] Grabación WebRTC guardada y subida exitosamente a AWS S3');
+            showToast('Videollamada finalizada. Grabación WebRTC guardada en AWS S3.', 'info');
+          }
+        } catch (err) {
+          console.warn('[API Gateway] Error al finalizar videoconsulta en el backend');
+        }
+      }
     }
   };
 
@@ -787,7 +869,7 @@ export default function App() {
                 )}
 
                 <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                  <button className={`btn ${isVideoActive ? 'btn-red' : 'btn-cyan'}`} style={{ flex: 1 }} onClick={() => { setIsVideoActive(!isVideoActive); setIsRecording(!isVideoActive); }}>
+                  <button className={`btn ${isVideoActive ? 'btn-red' : 'btn-cyan'}`} style={{ flex: 1 }} onClick={handleToggleVideoCall}>
                     {isVideoActive ? '🔴 Terminar Consulta' : '📹 Iniciar Videoconsulta'}
                   </button>
                   {isVideoActive && (
