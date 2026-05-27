@@ -1,63 +1,49 @@
 /**
  * Consumidor Kafka para EHR Service
- * Se suscribe a los tópicos Kafka relevantes para el historial clínico:
- *   - session.ended: al finalizar una videoconsulta, integra el resumen clínico
- *   - prescription.issued: registra la receta en el historial del paciente
- * Esto permite que el EHR se actualice automáticamente sin acoplamiento directo
- * con los otros microservicios (comunicación asíncrona event-driven).
+ * Reacciona a eventos de telemedicina y prescripciones para mantener
+ * el historial clínico actualizado sin acoplamiento directo a otros servicios.
+ *
+ * Tópicos:
+ *   - session.ended: integra el resumen clínico al historial del paciente
+ *   - prescriptions.issued: registra la receta emitida en el historial
  */
 
-import { Kafka, Consumer, EachMessagePayload } from 'kafkajs';
+import { BaseKafkaConsumer } from '../../../../shared/kafka/base-consumer';
 
-const kafka = new Kafka({
-  clientId: 'ehr-service',
-  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
-});
-
-export class KafkaEhrConsumer {
-  private consumer: Consumer;
-
+export class KafkaEhrConsumer extends BaseKafkaConsumer {
   constructor() {
-    this.consumer = kafka.consumer({ groupId: 'ehr-service-group' });
+    super('ehr-service', 'ehr-service-group');
   }
 
-  async start(): Promise<void> {
-    await this.consumer.connect();
-    await this.consumer.subscribe({
-      topics: ['session.ended', 'prescription.issued'],
-      fromBeginning: false,
-    });
-
-    await this.consumer.run({
-      eachMessage: async (payload: EachMessagePayload) => {
-        const { topic, message } = payload;
-        const event = JSON.parse(message.value?.toString() || '{}');
-        console.log(`[EHR Kafka] Evento recibido en ${topic}:`, event);
-
-        switch (topic) {
-          case 'session.ended':
-            await this.handleSessionEnded(event);
-            break;
-          case 'prescription.issued':
-            await this.handlePrescriptionIssued(event);
-            break;
-        }
-      },
-    });
+  get topics(): string[] {
+    return ['session.ended', 'prescriptions.issued'];
   }
 
-  private async handleSessionEnded(event: any): Promise<void> {
-    // Agregar resumen clínico al historial del paciente
-    console.log(`[EHR] Integrando resumen de sesión ${event.sessionId} al historial`);
-    // En implementación real: llamar al use case AddClinicalRecord
+  get fromBeginning(): boolean {
+    return false;
   }
 
-  private async handlePrescriptionIssued(event: any): Promise<void> {
-    // Registrar receta en el historial del paciente
-    console.log(`[EHR] Registrando receta ${event.prescriptionId} en historial`);
+  async handleMessage(topic: string, event: unknown): Promise<void> {
+    switch (topic) {
+      case 'session.ended':
+        await this.handleSessionEnded(event as Record<string, any>);
+        break;
+      case 'prescriptions.issued':
+        await this.handlePrescriptionIssued(event as Record<string, any>);
+        break;
+    }
   }
 
-  async stop(): Promise<void> {
-    await this.consumer.disconnect();
+  private async handleSessionEnded(event: Record<string, any>): Promise<void> {
+    // TODO: llamar a AddClinicalRecordUseCase con el resumen de sesión
+    const { sessionId, clinicalSummary } = event.payload ?? event;
+    void sessionId;
+    void clinicalSummary;
+  }
+
+  private async handlePrescriptionIssued(event: Record<string, any>): Promise<void> {
+    // TODO: llamar a AddClinicalRecordUseCase con la receta emitida
+    const { prescriptionId } = event.payload ?? event;
+    void prescriptionId;
   }
 }

@@ -1,28 +1,17 @@
 /**
  * Consumidor Kafka para Audit Service
- * Se suscribe a TODOS los tópicos de eventos del sistema para capturarlos
- * en el Ledger inmutable. Según FUNCIONAMIENTO.MD:
- * "audit-service captura todos los eventos anteriores, firmándolos y
- *  almacenándolos en la cadena de auditoría (Ledger)."
+ * Se suscribe a TODOS los tópicos del sistema para registrar cada evento
+ * en el Ledger inmutable. fromBeginning: true garantiza replay completo
+ * al reiniciar (consistencia del Ledger ante reinicios del servicio).
  *
- * Tópicos suscritos:
- *   - appointment.created
- *   - appointment.status_changed
- *   - session.ended
- *   - prescriptions.issued
- *   - alert.critical
+ * Tópicos: appointment.created, appointment.status_changed, session.ended,
+ *          prescriptions.issued, alert.critical
  */
 
-import { Kafka, Consumer, EachMessagePayload } from 'kafkajs';
+import { BaseKafkaConsumer } from '../../../../shared/kafka/base-consumer';
 import { RecordAuditEventUseCase } from '../../domain/use-cases/record-audit-event.usecase';
 import { AuditEventType } from '../../domain/entities/audit-event.entity';
 
-const kafka = new Kafka({
-  clientId: 'audit-service',
-  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
-});
-
-// Tópicos mapeados a tipos de eventos de auditoría
 const TOPIC_TO_EVENT_TYPE: Record<string, AuditEventType> = {
   'appointment.created': 'appointment.created',
   'appointment.status_changed': 'appointment.status_changed',
@@ -31,42 +20,26 @@ const TOPIC_TO_EVENT_TYPE: Record<string, AuditEventType> = {
   'alert.critical': 'alert.critical',
 };
 
-export class KafkaAuditConsumer {
-  private consumer: Consumer;
-
+export class KafkaAuditConsumer extends BaseKafkaConsumer {
   constructor(private readonly recordUseCase: RecordAuditEventUseCase) {
-    this.consumer = kafka.consumer({ groupId: 'audit-service-group' });
+    super('audit-service', 'audit-service-group');
   }
 
-  async start(): Promise<void> {
-    await this.consumer.connect();
-    await this.consumer.subscribe({
-      topics: Object.keys(TOPIC_TO_EVENT_TYPE),
-      fromBeginning: true, // Audit service necesita replay completo para consistencia
-    });
-
-    await this.consumer.run({
-      eachMessage: async (payload: EachMessagePayload) => {
-        const { topic, message, partition, heartbeat } = payload;
-        const raw = JSON.parse(message.value?.toString() || '{}');
-
-        try {
-          await this.recordUseCase.execute({
-            type: TOPIC_TO_EVENT_TYPE[topic],
-            sourceService: raw.metadata?.service || 'unknown',
-            payload: raw,
-            hmacSignature: raw.metadata?.hmac || '',
-          });
-          await heartbeat(); // Mantener la sesión Kafka viva en procesamiento largo
-        } catch (error) {
-          console.error(`[Audit] Error al registrar evento de ${topic}:`, error);
-          // En producción: enviar a DLQ (Dead Letter Queue) para análisis
-        }
-      },
-    });
+  get topics(): string[] {
+    return Object.keys(TOPIC_TO_EVENT_TYPE);
   }
 
-  async stop(): Promise<void> {
-    await this.consumer.disconnect();
+  get fromBeginning(): boolean {
+    return true;
+  }
+
+  async handleMessage(topic: string, event: unknown): Promise<void> {
+    const raw = event as Record<string, any>;
+    await this.recordUseCase.execute({
+      type: TOPIC_TO_EVENT_TYPE[topic],
+      sourceService: raw.metadata?.service || 'unknown',
+      payload: raw,
+      hmacSignature: raw.metadata?.hmac || '',
+    });
   }
 }
